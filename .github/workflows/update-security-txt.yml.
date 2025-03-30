@@ -1,0 +1,27 @@
+name: Update security.txt Expiration Date
+
+on:
+  schedule:
+    - cron: '0 0 1 1 *'  # Runs on January 1st every year
+  workflow_dispatch:  # Allows manual execution
+
+jobs:
+  update-security-txt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update expiration date
+        run: |
+          TODAY=$(date +%Y-%m-%dT%H:%M:%S.000Z --date='+1 year')
+          sed -i "s|^Expires: .*|Expires: $TODAY|" .well-known/security.txt
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .well-known/security.txt
+          git commit -m "Update security.txt expiration date to $TODAY" || echo "No changes to commit"
+          git push
