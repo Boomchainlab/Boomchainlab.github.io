@@ -1,16 +1,13 @@
-name: Set Build Metadata
+name: Set Build Metadata with Changelog
 
 on:
   workflow_call:
     outputs:
       build_timestamp:
-        description: "UTC build timestamp"
         value: ${{ jobs.set-metadata.outputs.build_timestamp }}
       short_sha:
-        description: "Short commit SHA"
         value: ${{ jobs.set-metadata.outputs.short_sha }}
       branch_name:
-        description: "Branch name"
         value: ${{ jobs.set-metadata.outputs.branch_name }}
 
 jobs:
@@ -22,7 +19,10 @@ jobs:
       branch_name: ${{ steps.export.outputs.branch_name }}
 
     steps:
-      - name: Generate metadata values
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate build metadata
         id: export
         run: |
           TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -36,8 +36,20 @@ jobs:
           echo "SHORT_SHA=$SHORT_SHA" >> metadata.env
           echo "BRANCH_NAME=$BRANCH" >> metadata.env
 
-      - name: Upload metadata as artifact
+      - name: Generate changelog from last tag (if exists)
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
+          echo "Generating changelog since $LATEST_TAG..."
+          if [ "$LATEST_TAG" != "no-tag" ]; then
+            git log "$LATEST_TAG"..HEAD --pretty=format:"- %s (%an)" > CHANGELOG.md
+          else
+            git log --pretty=format:"- %s (%an)" > CHANGELOG.md
+          fi
+
+      - name: Upload metadata and changelog
         uses: actions/upload-artifact@v4
         with:
-          name: build-metadata
-          path: metadata.env
+          name: build-assets
+          path: |
+            metadata.env
+            CHANGELOG.md
