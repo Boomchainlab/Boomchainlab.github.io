@@ -1,0 +1,43 @@
+name: Set Build Metadata
+
+on:
+  workflow_call:
+    outputs:
+      build_timestamp:
+        description: "UTC build timestamp"
+        value: ${{ jobs.set-metadata.outputs.build_timestamp }}
+      short_sha:
+        description: "Short commit SHA"
+        value: ${{ jobs.set-metadata.outputs.short_sha }}
+      branch_name:
+        description: "Branch name"
+        value: ${{ jobs.set-metadata.outputs.branch_name }}
+
+jobs:
+  set-metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      build_timestamp: ${{ steps.export.outputs.build_timestamp }}
+      short_sha: ${{ steps.export.outputs.short_sha }}
+      branch_name: ${{ steps.export.outputs.branch_name }}
+
+    steps:
+      - name: Generate metadata values
+        id: export
+        run: |
+          TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH=${GITHUB_REF##*/}
+          echo "build_timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
+
+          echo "BUILD_TIMESTAMP=$TIMESTAMP" > metadata.env
+          echo "SHORT_SHA=$SHORT_SHA" >> metadata.env
+          echo "BRANCH_NAME=$BRANCH" >> metadata.env
+
+      - name: Upload metadata as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata
+          path: metadata.env
