@@ -1,0 +1,60 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  dependabot:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure semantic labels exist
+        run: |
+          gh label create patch --color F0FFF0 --description "Patch version update" || echo "patch label exists"
+          gh label create minor --color F0FFFF --description "Minor version update" || echo "minor label exists"
+          gh label create major --color F08080 --description "Major version update" || echo "major label exists"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@d7267f607e9d3fb96fc2fbe83e0af444713e90b7
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Label PR based on update type
+        run: |
+          case "${{ steps.metadata.outputs.update-type }}" in
+            version-update:semver-patch)
+              gh pr edit "$PR_URL" --add-label "patch"
+              ;;
+            version-update:semver-minor)
+              gh pr edit "$PR_URL" --add-label "minor"
+              ;;
+            version-update:semver-major)
+              gh pr edit "$PR_URL" --add-label "major"
+              ;;
+          esac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+
+      - name: Auto-approve Dependabot PR
+        run: gh pr review "$PR_URL" --approve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+
+      - name: Auto-merge patch updates only
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr merge "$PR_URL" --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
